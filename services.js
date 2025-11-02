@@ -130,11 +130,28 @@ async function setupRealtimeListener() {
             throw new Error('Firebase DB není dostupný');
         }
         
-        const { collectionGroup, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+        const { collectionGroup, onSnapshot, getDocs } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
         
         // Čtení všech inzerátů napříč uživateli přes collectionGroup
         const servicesRef = collectionGroup(servicesFirebaseDb, 'inzeraty');
         console.log('📁 Services reference:', servicesRef);
+        
+        // Nejdříve zkusit jednorázový dotaz pro debug
+        console.log('🔍 Testuji přímý dotaz na inzeráty...');
+        try {
+            const testSnapshot = await getDocs(servicesRef);
+            console.log('✅ Test dotaz úspěšný! Počet inzerátů:', testSnapshot.docs.length);
+            console.log('Snapshot metadata:', {
+                fromCache: testSnapshot.metadata.fromCache,
+                hasPendingWrites: testSnapshot.metadata.hasPendingWrites
+            });
+        } catch (testError) {
+            console.error('❌ TEST DOTAZ SELHAL:', testError);
+            console.error('Error code:', testError.code);
+            console.error('Error message:', testError.message);
+            console.error('Pokud vidíte "permission-denied", zkontrolujte Firestore pravidla v Firebase Console!');
+            throw testError; // Necháme propadnout a zobrazit chybu
+        }
         
         // Bez orderBy - seřadíme v JavaScriptu
         console.log('🔍 Query bez orderBy (seřadíme v JS)');
@@ -210,10 +227,25 @@ async function setupRealtimeListener() {
             });
             updateConnectionStatus(false);
             
-            // Pokud je chyba s oprávněními nebo síťovými problémy, použij lokální fallback
-            if (error.code === 'permission-denied' || error.code === 'unavailable' || error.code === 'unauthenticated') {
-                console.log('🔒 Problém s Firebase, přepínám na lokální databázi');
-                initLocalFallback();
+            // Zobrazit chybu uživateli s konkrétními informacemi
+            if (error.code === 'permission-denied') {
+                const errorMsg = '🔒 Problém s oprávněními Firestore! Pravidla v Firebase Console mohou být nesprávně nastavena. ' +
+                    'Zkontrolujte konzoli prohlížeče pro více detailů. Používám lokální databázi.';
+                console.error(errorMsg);
+                console.error('📋 Pravidla v Firebase Console by měla povolit čtení collectionGroup("inzeraty") i bez přihlášení.');
+                showErrorMessage(errorMsg);
+                // Po 5 sekundách zkusit lokální fallback
+                setTimeout(() => {
+                    console.log('🔄 Přepínám na lokální databázi...');
+                    initLocalFallback();
+                }, 5000);
+            } else if (error.code === 'unavailable' || error.code === 'unauthenticated') {
+                console.log('🔒 Problém s Firebase připojením:', error.message);
+                showErrorMessage('Problém s připojením k databázi: ' + error.message);
+                // Po 3 sekundách zkusit lokální fallback
+                setTimeout(() => {
+                    initLocalFallback();
+                }, 3000);
             } else {
                 showErrorMessage('Chyba při sledování změn v databázi: ' + error.message);
                 // Po 3 sekundách zkusit lokální fallback
