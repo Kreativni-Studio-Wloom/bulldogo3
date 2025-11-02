@@ -201,6 +201,15 @@ async function setupRealtimeListener() {
             });
             
             console.log('📋 Všechny služby:', allServices);
+            console.log(`📊 Celkem načteno inzerátů: ${allServices.length}`);
+            
+            // Zobrazit statusy všech inzerátů pro debug
+            const statusCount = {};
+            allServices.forEach(service => {
+                const status = service.status || 'active';
+                statusCount[status] = (statusCount[status] || 0) + 1;
+            });
+            console.log('📊 Rozdělení podle statusu:', statusCount);
             
             // Pokud nejsou žádné služby, přidáme testovací
             if (allServices.length === 0) {
@@ -217,6 +226,9 @@ async function setupRealtimeListener() {
             // Respektovat aktuálně zadané filtry (včetně města)
             filterServices();
             updateStats();
+            
+            // Debug - kolik služeb prošlo filtrem
+            console.log(`✅ Po filtrování zobrazeno: ${filteredServices.length} z ${allServices.length} inzerátů`);
             
         }, (error) => {
             console.error('❌ Chyba v real-time listeneru:', error);
@@ -725,9 +737,12 @@ function filterServices() {
         const matchesSearch = !searchTerm || title.includes(searchTerm) || desc.includes(searchTerm) || loc.includes(searchTerm);
         const matchesCategory = !categoryFilter || (service?.category === categoryFilter);
         const matchesRegion = !regionFilter || (service?.location === regionFilter);
-        const isActive = (service?.status || 'active') === 'active';
+        // Zobrazit všechny inzeráty kromě smazaných nebo archivovaných
+        // Pokud status není nastaven, považujeme ho za aktivní
+        const status = service?.status || 'active';
+        const isNotDeleted = status !== 'deleted' && status !== 'archived';
 
-        return matchesSearch && matchesCategory && matchesRegion && isActive;
+        return matchesSearch && matchesCategory && matchesRegion && isNotDeleted;
     });
 
     // TOP inzeráty vždy první
