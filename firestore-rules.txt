@@ -1,0 +1,44 @@
+// Firebase Firestore pravidla pro povolení přístupu
+// Tyto pravidla musí být nastavena v Firebase Console
+// 
+// DŮLEŽITÉ: Zkopírujte tento obsah do Firebase Console → Firestore → Rules → Edit
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Umožnit čtení profilových telefonních čísel i bez autentifikace (pro kontrolu dostupnosti při registraci)
+    match /users/{userId}/profile/{profileId} {
+      // Povolit čtení telefonních čísel pro kontrolu dostupnosti
+      allow read: if true;
+      // Zápis pouze přihlášeným uživatelům (svůj vlastní profil)
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Veřejné čtení inzerátů (aby homepage a list fungovaly i bez přihlášení)
+    match /users/{userId}/inzeraty/{adId} {
+      allow read: if true;
+      // Zápis pouze vlastník účtu
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Umožnit čtení uživatelských dokumentů i bez autentifikace (pro collectionGroup dotazy na inzeráty)
+    // collectionGroup dotazy potřebují přístup k nadřazeným dokumentům uživatelů
+    match /users/{userId} {
+      allow read: if true;
+      // Zápis pouze vlastníku účtu
+      allow write: if request.auth != null && request.auth.uid == userId;
+      
+      // Povolit čtení recenzí k inzerátům i bez autentifikace
+      match /inzeraty/{adId}/reviews/{reviewId} {
+        allow read: if true;
+        allow write: if request.auth != null;
+      }
+      
+      // Povolit čtení recenzí uživatele i bez autentifikace
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow write: if request.auth != null;
+      }
+    }
+  }
+}
